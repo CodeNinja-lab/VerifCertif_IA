@@ -204,5 +204,14 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
         Route::get('/offres', [App\Http\Controllers\Api\V1\RecruiterStatisticsController::class, 'offres']);
         Route::get('/candidates', [App\Http\Controllers\Api\V1\RecruiterStatisticsController::class, 'candidates']);
     });
+    
+    // Dashboard Université
+    Route::prefix('dashboard')->middleware('role:admin')->group(function () {
+        Route::get('/stats', [App\Http\Controllers\Api\V1\DashboardController::class, 'universityStats']);
+        Route::get('/recent-degrees', [App\Http\Controllers\Api\V1\DashboardController::class, 'recentDegrees']);
+        Route::get('/recent-verifications', [App\Http\Controllers\Api\V1\DashboardController::class, 'recentVerifications']);
+        Route::get('/students/stats', [App\Http\Controllers\Api\V1\DashboardController::class, 'studentsStats']);
+        Route::get('/students/list', [App\Http\Controllers\Api\V1\DashboardController::class, 'studentsList']);
+    });
 });
 
