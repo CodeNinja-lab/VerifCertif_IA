@@ -100,16 +100,20 @@ class DocumentEmissionService
                 $metadata = json_decode($this->sanitizeUtf8($metadata), true);
             }
             
-            // Récupérer l'ID étudiant depuis les métadonnées ou utiliser null
-            // Si etudiant_id n'est pas fourni, on essaie de le récupérer depuis les métadonnées
+            // Récupérer l'ID étudiant depuis les métadonnées ou l'ID fourni
             $etudiantId = $data['etudiant_id'] ?? null;
+            
+            // Si pas d'etudiant_id mais student_id dans metadata, chercher l'étudiant par numero_etudiant
             if (!$etudiantId && isset($metadata['student_id'])) {
-                // Chercher l'étudiant par son ID personnalisé dans les métadonnées
-                // Pour l'instant, on laisse null car la contrainte ne le permet pas
-                // TODO: Créer un utilisateur étudiant ou modifier la migration pour permettre null
+                $etudiant = \App\Models\User::where('numero_etudiant', $metadata['student_id'])
+                    ->where('role', 'etudiant')
+                    ->first();
+                if ($etudiant) {
+                    $etudiantId = $etudiant->id;
+                }
             }
             
-            // Pour l'instant, si pas d'étudiant, on crée un utilisateur temporaire ou on utilise l'admin
+            // Pour l'instant, si pas d'étudiant, on utilise l'admin
             // Solution temporaire : utiliser l'ID de l'opérateur comme étudiant si pas d'étudiant spécifié
             if (!$etudiantId) {
                 $etudiantId = $data['operateur_id'] ?? null;

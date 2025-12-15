@@ -31,6 +31,7 @@ class User extends Authenticatable
         'nom',
         'nom_entreprise',
         'email',
+        'numero_etudiant',
         'mot_de_passe_hash',
         'role',
         'telephone',

@@ -23,6 +23,11 @@ class RegisterRequest extends FormRequest
             'langue' => 'sometimes|string|in:fr,en,es,ar|max:5',
         ];
 
+        // Le numéro étudiant est requis pour les étudiants
+        if ($this->input('role') === 'etudiant') {
+            $rules['numero_etudiant'] = 'required|string|max:50|unique:users,numero_etudiant';
+        }
+
         // Le nom de l'entreprise est requis uniquement pour les recruteurs
         if ($this->input('role') === 'recruteur') {
             $rules['nom_entreprise'] = 'required|string|max:255';
@@ -46,6 +51,9 @@ class RegisterRequest extends FormRequest
             'role.in' => 'Le rôle doit être etudiant ou recruteur.',
             'telephone.required' => 'Le numéro de téléphone est obligatoire.',
             'langue.in' => 'La langue doit être fr, en, es ou ar.',
+            'numero_etudiant.required' => 'Le numéro étudiant est obligatoire.',
+            'numero_etudiant.unique' => 'Ce numéro étudiant est déjà utilisé.',
+            'numero_etudiant.max' => 'Le numéro étudiant ne peut pas dépasser 50 caractères.',
         ];
     }
 }

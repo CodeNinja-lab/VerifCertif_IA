@@ -39,6 +39,11 @@ class AuthController extends Controller
             'is_active' => true,
         ];
 
+        // Ajouter le numéro étudiant si présent (pour les étudiants)
+        if (isset($validated['numero_etudiant'])) {
+            $userData['numero_etudiant'] = $validated['numero_etudiant'];
+        }
+
         // Ajouter le nom de l'entreprise si présent (pour les recruteurs)
         if (isset($validated['nom_entreprise'])) {
             $userData['nom_entreprise'] = $validated['nom_entreprise'];

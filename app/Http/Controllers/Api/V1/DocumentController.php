@@ -76,6 +76,43 @@ class DocumentController extends Controller
     }
 
     /**
+     * Récupérer les documents (diplômes) de l'étudiant connecté
+     * Recherche par etudiant_id OU par numero_etudiant dans les metadata
+     */
+    public function myDocuments(Request $request)
+    {
+        $user = $request->user();
+        
+        if ($user->role !== 'etudiant') {
+            return response()->json([
+                'message' => 'Cette route est réservée aux étudiants',
+            ], 403);
+        }
+
+        $query = Document::with(['administration'])
+            ->where(function ($q) use ($user) {
+                // Chercher par ID utilisateur
+                $q->where('etudiant_id', $user->id);
+                
+                // OU par numéro étudiant dans les metadata
+                if ($user->numero_etudiant) {
+                    $q->orWhereJsonContains('metadata->student_id', $user->numero_etudiant);
+                }
+            })
+            ->where('statut', 'ACTIF');
+
+        // Filtre par type de document
+        if ($request->has('type_document')) {
+            $query->where('type_document', $request->type_document);
+        }
+
+        $documents = $query->orderBy('date_emission', 'desc')
+                          ->paginate($request->get('per_page', 15));
+
+        return DocumentResource::collection($documents);
+    }
+
+    /**
      * Créer un document (flux d'émission complet)
      */
     public function store(StoreDocumentRequest $request)
@@ -248,10 +285,33 @@ class DocumentController extends Controller
     public function download(Request $request, $id)
     {
         $document = Document::findOrFail($id);
+        $user = $request->user();
 
-        // Vérification des permissions
-        if ($request->user()->role === 'etudiant' && $document->etudiant_id !== $request->user()->id) {
-            return response()->json(['message' => 'Accès refusé'], 403);
+        // Vérification des permissions pour les étudiants
+        if ($user->role === 'etudiant') {
+            $hasAccess = false;
+            
+            // Vérifier par etudiant_id
+            if ($document->etudiant_id === $user->id) {
+                $hasAccess = true;
+            }
+            
+            // Vérifier par numero_etudiant dans les metadata
+            if (!$hasAccess && $user->numero_etudiant) {
+                $metadata = $document->metadata;
+                if (is_array($metadata) && isset($metadata['student_id']) && $metadata['student_id'] === $user->numero_etudiant) {
+                    $hasAccess = true;
+                }
+            }
+            
+            if (!$hasAccess) {
+                return response()->json(['message' => 'Accès refusé'], 403);
+            }
+        }
+
+        // Vérifier que le fichier existe
+        if (empty($document->file_url)) {
+            return response()->json(['message' => 'Aucun fichier associé à ce document'], 404);
         }
 
         // Le fichier est stocké sur le disque 'public'

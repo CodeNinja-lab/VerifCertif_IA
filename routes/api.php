@@ -74,6 +74,7 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     // Documents
     Route::prefix('documents')->group(function () {
         Route::get('/', [App\Http\Controllers\Api\V1\DocumentController::class, 'index']);
+        Route::get('/my-documents', [App\Http\Controllers\Api\V1\DocumentController::class, 'myDocuments']); // Diplômes de l'étudiant connecté
         Route::post('/', [App\Http\Controllers\Api\V1\DocumentController::class, 'store']);
         Route::get('/{id}', [App\Http\Controllers\Api\V1\DocumentController::class, 'show']);
         Route::put('/{id}', [App\Http\Controllers\Api\V1\DocumentController::class, 'update']);
