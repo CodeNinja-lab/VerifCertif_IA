@@ -7,6 +7,7 @@ use App\Models\Matching;
 use App\Models\ProfilEtudiant;
 use App\Models\ProfilCompetence;
 use App\Models\OffreCompetence;
+use App\Services\NotificationService;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
@@ -101,13 +102,30 @@ class MatchingService
                     'points_forts' => $matchResult['points_forts'],
                     'points_amelioration' => $matchResult['points_amelioration'],
                     'algorithme_version' => $this->algorithmeVersion,
-                    'seuil_notification' => 70.0, // Seuil par défaut
+                    'seuil_notification' => 90.0, // Seuil par défaut (90% pour notifications)
                 ]);
 
-                // Notifier si le score dépasse le seuil et n'était pas déjà notifié
-                if ($matchResult['score_global'] >= 70 && !$matching->notifie) {
+                // Notifier si le score dépasse 90% et n'était pas déjà notifié
+                if ($matchResult['score_global'] >= 90 && !$matching->notifie) {
                     $matching->notifie = true;
                     $matching->date_notification = Carbon::now();
+                    
+                    // Envoyer une notification à l'étudiant
+                    try {
+                        $notificationService = new NotificationService();
+                        $entrepriseNom = $offre->recruteur?->entreprise?->nom ?? 'Une entreprise';
+                        
+                        $notificationService->matchingEleve(
+                            $profil->utilisateur_id,
+                            $offre->titre,
+                            $entrepriseNom,
+                            (int) $matchResult['score_global'],
+                            $offre->id
+                        );
+                    } catch (\Exception $e) {
+                        // Log l'erreur mais ne bloque pas le processus
+                        \Log::warning("Erreur envoi notification matching: " . $e->getMessage());
+                    }
                 }
 
                 $matching->save();

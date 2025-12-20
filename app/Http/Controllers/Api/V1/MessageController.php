@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Conversation;
 use App\Models\Message;
 use App\Models\Matching;
+use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -95,6 +96,91 @@ class MessageController extends Controller
     }
 
     /**
+     * Liste des conversations pour l'étudiant
+     */
+    public function studentConversations(Request $request)
+    {
+        $user = $request->user();
+
+        $conversations = Conversation::where('etudiant_id', $user->id)
+            ->with(['recruteur', 'offre'])
+            ->with(['messages' => function($query) {
+                $query->latest()->limit(1);
+            }, 'messages.sender'])
+            ->orderBy('last_message_at', 'desc')
+            ->get()
+            ->map(function($conv) use ($user) {
+                $lastMessage = $conv->messages->first();
+                $unreadCount = Message::where('conversation_id', $conv->id)
+                    ->where('sender_id', '!=', $user->id)
+                    ->where('is_read', false)
+                    ->count();
+                
+                return [
+                    'id' => $conv->id,
+                    'company' => $conv->recruteur->nom_entreprise ?? $conv->recruteur->name,
+                    'recruiter' => $conv->recruteur->name,
+                    'recruiter_id' => $conv->recruteur_id,
+                    'avatar' => $conv->recruteur->photo_url,
+                    'lastMessage' => $lastMessage ? $lastMessage->content : 'Aucun message',
+                    'time' => $lastMessage ? $lastMessage->created_at->diffForHumans() : '',
+                    'unread' => $unreadCount,
+                    'online' => false,
+                    'offre_id' => $conv->offre_id,
+                    'offre_titre' => $conv->offre->titre ?? null,
+                ];
+            });
+
+        return response()->json(['success' => true, 'data' => $conversations]);
+    }
+
+    /**
+     * Obtenir une conversation par ID (version étudiant)
+     */
+    public function getStudentConversation(Request $request, $id)
+    {
+        $user = $request->user();
+        
+        $conversation = Conversation::where('id', $id)
+            ->where('etudiant_id', $user->id)
+            ->with(['recruteur', 'offre', 'messages.sender'])
+            ->firstOrFail();
+
+        $conversation->load(['messages' => function($query) {
+            $query->orderBy('created_at', 'asc');
+        }]);
+
+        // Marquer les messages comme lus
+        Message::where('conversation_id', $id)
+            ->where('sender_id', '!=', $user->id)
+            ->update(['is_read' => true, 'read_at' => now()]);
+        
+        $conversation->update(['etudiant_has_unread' => false]);
+
+        return response()->json([
+            'success' => true,
+            'conversation' => [
+                'id' => $conversation->id,
+                'company' => $conversation->recruteur->nom_entreprise ?? $conversation->recruteur->name,
+                'recruiter' => $conversation->recruteur->name,
+                'recruiter_id' => $conversation->recruteur_id,
+                'offre_id' => $conversation->offre_id,
+                'offre_titre' => $conversation->offre->titre ?? null,
+            ],
+            'messages' => $conversation->messages->map(function($msg) use ($user) {
+                return [
+                    'id' => $msg->id,
+                    'sender' => $msg->sender_id === $user->id ? 'me' : 'recruiter',
+                    'content' => $msg->content,
+                    'time' => $msg->created_at->format('H:i'),
+                    'date' => $msg->created_at->format('Y-m-d'),
+                    'is_read' => $msg->is_read,
+                ];
+            }),
+        ]);
+    }
+
+    /**
      * Obtenir ou créer une conversation
      */
     public function getOrCreateConversation(Request $request, $etudiantId, $offreId = null)
@@ -173,7 +259,7 @@ class MessageController extends Controller
             'content' => 'required|string|max:5000',
         ]);
 
-        $conversation = Conversation::findOrFail($conversationId);
+        $conversation = Conversation::with(['recruteur', 'etudiant'])->findOrFail($conversationId);
 
         // Vérifier les permissions
         if ($conversation->recruteur_id !== $user->id && $conversation->etudiant_id !== $user->id) {
@@ -194,6 +280,15 @@ class MessageController extends Controller
                 'recruteur_has_unread' => $user->id !== $conversation->recruteur_id,
                 'etudiant_has_unread' => $user->id !== $conversation->etudiant_id,
             ]);
+
+            // Envoyer une notification au destinataire
+            $notificationService = new NotificationService();
+            $destinataireId = $user->id === $conversation->recruteur_id 
+                ? $conversation->etudiant_id 
+                : $conversation->recruteur_id;
+            $expediteurNom = $user->prenom . ' ' . $user->nom;
+            
+            $notificationService->nouveauMessage($destinataireId, $expediteurNom, $conversationId);
 
             DB::commit();
 

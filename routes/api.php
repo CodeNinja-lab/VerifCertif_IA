@@ -54,6 +54,8 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     Route::get('/auth/me', [App\Http\Controllers\Api\V1\AuthController::class, 'me']);
     Route::put('/auth/profile', [App\Http\Controllers\Api\V1\AuthController::class, 'updateProfile']);
     Route::post('/auth/change-password', [App\Http\Controllers\Api\V1\AuthController::class, 'changePassword']);
+    Route::post('/auth/upload-photo', [App\Http\Controllers\Api\V1\AuthController::class, 'uploadPhoto']);
+    Route::delete('/auth/delete-photo', [App\Http\Controllers\Api\V1\AuthController::class, 'deletePhoto']);
 
     // Codes d'accès admin (génération par les admins / universités)
     Route::prefix('admin-access-codes')->middleware('role:admin')->group(function () {
@@ -114,6 +116,33 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
         Route::delete('/competences/{competenceId}', [App\Http\Controllers\Api\V1\ProfilEtudiantController::class, 'removeCompetence']);
     });
     
+    // CV - Expériences, Formations, Certifications
+    Route::prefix('cv')->group(function () {
+        // Toutes les données du CV
+        Route::get('/', [App\Http\Controllers\Api\V1\CVController::class, 'index']);
+        
+        // Expériences
+        Route::get('/experiences', [App\Http\Controllers\Api\V1\CVController::class, 'experienceIndex']);
+        Route::post('/experiences', [App\Http\Controllers\Api\V1\CVController::class, 'experienceStore']);
+        Route::get('/experiences/{id}', [App\Http\Controllers\Api\V1\CVController::class, 'experienceShow']);
+        Route::put('/experiences/{id}', [App\Http\Controllers\Api\V1\CVController::class, 'experienceUpdate']);
+        Route::delete('/experiences/{id}', [App\Http\Controllers\Api\V1\CVController::class, 'experienceDestroy']);
+        
+        // Formations
+        Route::get('/formations', [App\Http\Controllers\Api\V1\CVController::class, 'formationIndex']);
+        Route::post('/formations', [App\Http\Controllers\Api\V1\CVController::class, 'formationStore']);
+        Route::get('/formations/{id}', [App\Http\Controllers\Api\V1\CVController::class, 'formationShow']);
+        Route::put('/formations/{id}', [App\Http\Controllers\Api\V1\CVController::class, 'formationUpdate']);
+        Route::delete('/formations/{id}', [App\Http\Controllers\Api\V1\CVController::class, 'formationDestroy']);
+        
+        // Certifications
+        Route::get('/certifications', [App\Http\Controllers\Api\V1\CVController::class, 'certificationIndex']);
+        Route::post('/certifications', [App\Http\Controllers\Api\V1\CVController::class, 'certificationStore']);
+        Route::get('/certifications/{id}', [App\Http\Controllers\Api\V1\CVController::class, 'certificationShow']);
+        Route::put('/certifications/{id}', [App\Http\Controllers\Api\V1\CVController::class, 'certificationUpdate']);
+        Route::delete('/certifications/{id}', [App\Http\Controllers\Api\V1\CVController::class, 'certificationDestroy']);
+    });
+    
     // Offres d'emploi
     Route::prefix('offres')->group(function () {
         // Route pour les offres du recruteur (authentifiée) - DOIT être AVANT les routes avec {id}
@@ -146,6 +175,28 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
         Route::post('/calculate', [App\Http\Controllers\Api\V1\MatchingController::class, 'calculate'])->middleware('role:admin');
     });
     
+    // Candidatures
+    Route::prefix('candidatures')->group(function () {
+        // Routes pour étudiants
+        Route::get('/', [App\Http\Controllers\Api\V1\CandidatureController::class, 'index']);
+        Route::post('/', [App\Http\Controllers\Api\V1\CandidatureController::class, 'store']);
+        Route::get('/{id}', [App\Http\Controllers\Api\V1\CandidatureController::class, 'show'])->where('id', '[0-9]+');
+        Route::delete('/{id}', [App\Http\Controllers\Api\V1\CandidatureController::class, 'destroy'])->where('id', '[0-9]+');
+        
+        // Routes pour recruteurs
+        Route::get('/offre/{offreId}', [App\Http\Controllers\Api\V1\CandidatureController::class, 'forOffre'])->middleware('role:recruteur,admin')->where('offreId', '[0-9]+');
+        Route::put('/{id}/status', [App\Http\Controllers\Api\V1\CandidatureController::class, 'updateStatus'])->middleware('role:recruteur,admin')->where('id', '[0-9]+');
+    });
+    
+    // Favoris
+    Route::prefix('favoris')->group(function () {
+        Route::get('/', [App\Http\Controllers\Api\V1\FavoriController::class, 'index']);
+        Route::post('/', [App\Http\Controllers\Api\V1\FavoriController::class, 'store']);
+        Route::post('/toggle', [App\Http\Controllers\Api\V1\FavoriController::class, 'toggle']);
+        Route::get('/check/{offreId}', [App\Http\Controllers\Api\V1\FavoriController::class, 'check'])->where('offreId', '[0-9]+');
+        Route::delete('/{offreId}', [App\Http\Controllers\Api\V1\FavoriController::class, 'destroy'])->where('offreId', '[0-9]+');
+    });
+    
     // Notifications
     Route::prefix('notifications')->group(function () {
         Route::get('/', [App\Http\Controllers\Api\V1\NotificationController::class, 'index']);
@@ -164,10 +215,17 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
 
     // Messages
     Route::prefix('messages')->group(function () {
+        // Routes pour recruteurs
         Route::get('/conversations', [App\Http\Controllers\Api\V1\MessageController::class, 'conversations'])->middleware('role:recruteur,admin');
-        Route::get('/conversation/{id}', [App\Http\Controllers\Api\V1\MessageController::class, 'getConversation']);
         Route::get('/conversation/{etudiantId}/create', [App\Http\Controllers\Api\V1\MessageController::class, 'getOrCreateConversation'])->middleware('role:recruteur,admin');
         Route::get('/conversation/{etudiantId}/{offreId}/create', [App\Http\Controllers\Api\V1\MessageController::class, 'getOrCreateConversation'])->middleware('role:recruteur,admin');
+        
+        // Routes pour étudiants
+        Route::get('/my-conversations', [App\Http\Controllers\Api\V1\MessageController::class, 'studentConversations']);
+        Route::get('/my-conversation/{id}', [App\Http\Controllers\Api\V1\MessageController::class, 'getStudentConversation']);
+        
+        // Routes communes
+        Route::get('/conversation/{id}', [App\Http\Controllers\Api\V1\MessageController::class, 'getConversation']);
         Route::post('/conversation/{conversationId}/send', [App\Http\Controllers\Api\V1\MessageController::class, 'sendMessage']);
         Route::post('/conversation/{conversationId}/read', [App\Http\Controllers\Api\V1\MessageController::class, 'markAsRead']);
     });

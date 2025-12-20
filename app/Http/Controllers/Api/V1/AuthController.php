@@ -17,6 +17,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
@@ -296,6 +297,67 @@ class AuthController extends Controller
         return response()->json([
             'message' => 'Impossible de réinitialiser le mot de passe',
         ], 400);
+    }
+
+    /**
+     * Upload de la photo de profil
+     */
+    public function uploadPhoto(Request $request)
+    {
+        $request->validate([
+            'photo' => 'required|image|mimes:jpeg,png,jpg,gif,webp|max:5120', // Max 5MB
+        ], [
+            'photo.required' => 'La photo est requise.',
+            'photo.image' => 'Le fichier doit être une image.',
+            'photo.mimes' => 'La photo doit être au format jpeg, png, jpg, gif ou webp.',
+            'photo.max' => 'La photo ne doit pas dépasser 5 Mo.',
+        ]);
+
+        $user = $request->user();
+
+        // Supprimer l'ancienne photo si elle existe
+        if ($user->photo_url) {
+            $oldPath = str_replace('/storage/', '', parse_url($user->photo_url, PHP_URL_PATH));
+            if ($oldPath && Storage::disk('public')->exists($oldPath)) {
+                Storage::disk('public')->delete($oldPath);
+            }
+        }
+
+        // Stocker la nouvelle photo
+        $file = $request->file('photo');
+        $filename = 'profile_' . $user->id . '_' . time() . '.' . $file->getClientOriginalExtension();
+        $path = $file->storeAs('profile-photos', $filename, 'public');
+
+        // Mettre à jour l'URL de la photo dans la base de données
+        $photoUrl = url('/storage/' . $path);
+        $user->update(['photo_url' => $photoUrl]);
+
+        return response()->json([
+            'message' => 'Photo de profil mise à jour avec succès',
+            'photo_url' => $photoUrl,
+            'user' => new UserResource($user->fresh()),
+        ]);
+    }
+
+    /**
+     * Supprimer la photo de profil
+     */
+    public function deletePhoto(Request $request)
+    {
+        $user = $request->user();
+
+        if ($user->photo_url) {
+            $oldPath = str_replace('/storage/', '', parse_url($user->photo_url, PHP_URL_PATH));
+            if ($oldPath && Storage::disk('public')->exists($oldPath)) {
+                Storage::disk('public')->delete($oldPath);
+            }
+            $user->update(['photo_url' => null]);
+        }
+
+        return response()->json([
+            'message' => 'Photo de profil supprimée avec succès',
+            'user' => new UserResource($user->fresh()),
+        ]);
     }
 }
 

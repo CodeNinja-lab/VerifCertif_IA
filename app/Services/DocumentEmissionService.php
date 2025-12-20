@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Document;
 use App\Models\Administration;
 use App\Models\AuditLog;
+use App\Services\NotificationService;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -171,6 +172,22 @@ class DocumentEmissionService
                 ],
                 'user_agent' => request()->userAgent(),
             ]);
+            
+            // Envoyer une notification à l'étudiant
+            try {
+                $notificationService = new NotificationService();
+                $notificationService->certificatDisponible(
+                    $etudiantId,
+                    $document->titre,
+                    $document->id
+                );
+            } catch (\Exception $e) {
+                // Log l'erreur mais ne bloque pas le processus
+                Log::warning("Échec envoi notification certificat", [
+                    'document_id' => $document->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
             
             DB::commit();
             
