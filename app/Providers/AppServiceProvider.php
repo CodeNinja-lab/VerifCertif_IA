@@ -4,7 +4,15 @@ namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
 use App\Models\Administration;
+use App\Models\ProfilCompetence;
+use App\Models\Certification;
+use App\Models\Offre;
+use App\Models\OffreCompetence;
 use App\Observers\AdministrationObserver;
+use App\Observers\ProfilCompetenceObserver;
+use App\Observers\CertificationObserver;
+use App\Observers\OffreObserver;
+use App\Observers\OffreCompetenceObserver;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -26,7 +34,11 @@ class AppServiceProvider extends ServiceProvider
             request()->headers->set('Accept', 'application/json');
         }
 
-        // Enregistrer l'observer pour la génération automatique des clés
+        // Enregistrer les observers
         Administration::observe(AdministrationObserver::class);
+        ProfilCompetence::observe(ProfilCompetenceObserver::class);
+        Certification::observe(CertificationObserver::class);
+        Offre::observe(OffreObserver::class);
+        OffreCompetence::observe(OffreCompetenceObserver::class);
     }
 }

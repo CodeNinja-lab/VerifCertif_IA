@@ -8,47 +8,67 @@ use App\Models\Matching;
 use App\Models\Offre;
 use App\Models\ProfilEtudiant;
 use App\Services\MatchingService;
+use App\Services\EmbeddingService;
 use Illuminate\Http\Request;
 
 class MatchingController extends Controller
 {
     protected $matchingService;
+    protected $embeddingService;
 
-    public function __construct(MatchingService $matchingService)
+    public function __construct(MatchingService $matchingService, EmbeddingService $embeddingService)
     {
         $this->matchingService = $matchingService;
+        $this->embeddingService = $embeddingService;
     }
 
     /**
-     * Liste des matchings pour l'étudiant connecté
+     * Liste des offres compatibles pour l'étudiant connecté (basé sur IA/embeddings)
      */
     public function index(Request $request)
     {
-        $query = Matching::with(['offre', 'offre.recruteur', 'offre.offreCompetences.competence'])
-                        ->where('etudiant_id', $request->user()->id);
+        $userId = $request->user()->id;
+        $limit = $request->get('limit', 20);
+        $minScore = $request->get('min_score', 0);
 
-        // Filtres
-        if ($request->has('interesse')) {
-            $query->whereNotNull('interesse');
-            if ($request->interesse === 'true') {
-                $query->where('interesse', true);
-            } else {
-                $query->where('interesse', false);
+        // Obtenir les recommandations IA
+        $recommendations = $this->embeddingService->getCompatibleJobOffers($userId, $limit);
+
+        // Filtrer par score minimum si demandé
+        if ($minScore > 0) {
+            $recommendations = array_filter($recommendations, function ($rec) use ($minScore) {
+                return $rec['similarity_score'] >= $minScore;
+            });
+        }
+
+        // Enrichir avec les données complètes des offres
+        $offreIds = array_column($recommendations, 'offre_id');
+        $offres = Offre::with(['recruteur', 'offreCompetences.competence'])
+            ->whereIn('id', $offreIds)
+            ->where('statut', 'PUBLIEE')
+            ->get()
+            ->keyBy('id');
+
+        $results = [];
+        foreach ($recommendations as $rec) {
+            $offre = $offres->get($rec['offre_id']);
+            if ($offre) {
+                $results[] = [
+                    'offre' => $offre,
+                    'ai_score' => $rec['similarity_score'],
+                    'title' => $rec['title'],
+                ];
             }
         }
 
-        if ($request->has('min_score')) {
-            $query->where('score_global', '>=', $request->min_score);
-        }
-
-        // Tri
-        $sortBy = $request->get('sort_by', 'score_global');
-        $sortOrder = $request->get('sort_order', 'desc');
-        $query->orderBy($sortBy, $sortOrder);
-
-        $matchings = $query->paginate($request->get('per_page', 15));
-
-        return MatchingResource::collection($matchings);
+        return response()->json([
+            'data' => $results,
+            'meta' => [
+                'total' => count($results),
+                'algorithm' => 'AI Embeddings (Cosine Similarity)',
+                'model' => 'all-MiniLM-L6-v2',
+            ],
+        ]);
     }
 
     /**
