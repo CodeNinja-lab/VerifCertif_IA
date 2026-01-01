@@ -102,6 +102,15 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
         Route::delete('/{id}', [App\Http\Controllers\Api\V1\CompetenceController::class, 'destroy']);
     });
     
+    // Diplômes (CRUD pour admin et administration)
+    Route::prefix('diplomes')->middleware('role:admin,administration')->group(function () {
+        Route::get('/', [App\Http\Controllers\Api\V1\DiplomeController::class, 'index']);
+        Route::post('/', [App\Http\Controllers\Api\V1\DiplomeController::class, 'store']);
+        Route::get('/{id}', [App\Http\Controllers\Api\V1\DiplomeController::class, 'show']);
+        Route::put('/{id}', [App\Http\Controllers\Api\V1\DiplomeController::class, 'update']);
+        Route::delete('/{id}', [App\Http\Controllers\Api\V1\DiplomeController::class, 'destroy']);
+    });
+    
     // Profil étudiant
     Route::prefix('profil-etudiant')->group(function () {
         Route::get('/', [App\Http\Controllers\Api\V1\ProfilEtudiantController::class, 'show']);

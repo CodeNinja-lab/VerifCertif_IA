@@ -193,6 +193,60 @@ class DocumentController extends Controller
             // Utiliser le service d'émission complet
             $document = $this->emissionService->emitDocument($validated);
 
+            // Si un diplôme est associé, lier automatiquement les compétences au profil de l'étudiant
+            if (isset($validated['metadata']['diplome_id']) && $validated['metadata']['diplome_id']) {
+                try {
+                    $diplome = \App\Models\Diplome::with('competences')->find($validated['metadata']['diplome_id']);
+                    
+                    if ($diplome && $diplome->competences && $diplome->competences->count() > 0) {
+                        // Trouver l'étudiant
+                        $etudiant = null;
+                        
+                        // Si etudiant_id est fourni directement
+                        if (!empty($validated['etudiant_id'])) {
+                            $etudiant = \App\Models\User::find($validated['etudiant_id']);
+                        }
+                        
+                        // Sinon, chercher par student_id dans les métadonnées
+                        if (!$etudiant && isset($validated['metadata']['student_id'])) {
+                            $etudiant = \App\Models\User::where('numero_etudiant', $validated['metadata']['student_id'])->first();
+                        }
+                        
+                        // Si on a trouvé l'étudiant, lier les compétences
+                        if ($etudiant) {
+                            $profilEtudiant = \App\Models\ProfilEtudiant::where('utilisateur_id', $etudiant->id)->first();
+                            
+                            if ($profilEtudiant) {
+                                foreach ($diplome->competences as $competence) {
+                                    // Vérifier si la compétence n'est pas déjà liée
+                                    $existing = \App\Models\ProfilCompetence::where('profil_etudiant_id', $profilEtudiant->id)
+                                        ->where('competence_id', $competence->id)
+                                        ->first();
+                                    
+                                    if (!$existing) {
+                                        \App\Models\ProfilCompetence::create([
+                                            'profil_etudiant_id' => $profilEtudiant->id,
+                                            'competence_id' => $competence->id,
+                                            'niveau' => 'certifie',
+                                            'source' => 'diplome',
+                                            'source_document_id' => $document->id,
+                                            'score_confiance' => 1.0,
+                                            'validee_par_etudiant' => false,
+                                        ]);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } catch (\Exception $e) {
+                    // Logger l'erreur mais ne pas bloquer la création du document
+                    \Log::warning('Erreur lors de la liaison des compétences du diplôme', [
+                        'diplome_id' => $validated['metadata']['diplome_id'] ?? null,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+
             return response()->json([
                 'message' => 'Document certifié avec succès',
                 'document' => new DocumentResource($document->load(['etudiant', 'administration'])),
