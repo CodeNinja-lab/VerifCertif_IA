@@ -235,6 +235,11 @@ class DocumentController extends Controller
                                         ]);
                                     }
                                 }
+
+                                // Régénérer l'embedding du candidat avec la pondération 75/25 dès l'émission du diplôme
+                                dispatch(function () use ($etudiant) {
+                                    app(\App\Services\EmbeddingService::class)->generateCandidateEmbedding($etudiant->id);
+                                })->afterResponse();
                             }
                         }
                     }

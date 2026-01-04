@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\CandidateEmbedding;
+use App\Models\Document;
 use App\Models\JobOfferEmbedding;
 use App\Models\ProfilEtudiant;
 use App\Models\ProfilCompetence;
@@ -23,7 +24,8 @@ class EmbeddingService
 
     /**
      * Construire le texte du profil candidat pour l'embedding
-     * Règle: 75% compétences certifiées si disponibles, sinon 100% compétences déclarées
+     * Règle: 75% compétences certifiées (diplôme vérifié) et 25% compétences déclarées
+     * En absence de diplôme certifié, seules les compétences non certifiées sont utilisées
      */
     public function buildCandidateProfileText(int $userId): ?string
     {
@@ -39,6 +41,12 @@ class EmbeddingService
         $profil = $user->profilEtudiant;
         $competences = $profil->profilCompetences;
 
+        // Un diplôme actif active la pondération 75/25
+        $hasDiploma = Document::where('etudiant_id', $userId)
+            ->where('type_document', 'diplome')
+            ->whereIn('statut', ['ACTIF', 'verifie', 'VERIFIE', 'valide', 'VALIDE'])
+            ->exists();
+
         // Séparer compétences certifiées et non certifiées
         $certifiedSkills = [];
         $uncertifiedSkills = [];
@@ -51,8 +59,12 @@ class EmbeddingService
                 $skillText .= " - {$profilComp->annees_experience} ans d'expérience";
             }
 
-            // Compétence certifiée = issue d'un document validé
-            if ($profilComp->source === 'document' && $profilComp->source_document_id && $profilComp->validee_par_etudiant) {
+            // Mettre en avant les compétences issues d'un diplôme ou d'un document vérifié
+            if ($profilComp->source === 'diplome') {
+                $hasDiploma = true;
+            }
+
+            if ($this->isCertifiedCompetence($profilComp)) {
                 $certifiedSkills[] = $skillText;
             } else {
                 $uncertifiedSkills[] = $skillText;
@@ -70,25 +82,25 @@ class EmbeddingService
             $profileParts[] = "Profil: {$profil->bio}";
         }
 
-        // Compétences certifiées (prioritaires)
-        if (!empty($certifiedSkills)) {
-            $profileParts[] = "Compétences certifiées: " . implode(', ', $certifiedSkills);
-            $profileParts[] = "✓ Profil vérifié par blockchain";
-        }
+        if ($hasDiploma && !empty($certifiedSkills)) {
+            $profileParts[] = "Statut: Candidat certifié (diplôme vérifié)";
+            $profileParts[] = "Compétences certifiées (75%): " . implode(', ', $certifiedSkills);
 
-        // Compétences non certifiées (maximum 25% du poids si certifications existent)
-        if (!empty($uncertifiedSkills)) {
-            if (empty($certifiedSkills)) {
-                // Pas de diplôme certifié: utiliser toutes les compétences déclarées
-                $profileParts[] = "Compétences déclarées: " . implode(', ', $uncertifiedSkills);
-                $profileParts[] = "⚠ Profil non certifié";
-            } else {
-                // Limiter les compétences non certifiées pour respecter le ratio 75/25
-                $maxUncertified = (int) (count($certifiedSkills) / 3);
+            // Limiter les compétences non certifiées à 25% du poids total
+            if (!empty($uncertifiedSkills)) {
+                $maxUncertified = max(1, (int) ceil(count($certifiedSkills) / 3));
                 $limitedUncertified = array_slice($uncertifiedSkills, 0, $maxUncertified);
+
                 if (!empty($limitedUncertified)) {
-                    $profileParts[] = "Autres compétences: " . implode(', ', $limitedUncertified);
+                    $profileParts[] = "Compétences déclarées (25%): " . implode(', ', $limitedUncertified);
                 }
+            }
+        } else {
+            // Pas de diplôme certifié: ne conserver que les compétences non certifiées et marquer le statut
+            $profileParts[] = "Statut: Candidat non certifié";
+
+            if (!empty($uncertifiedSkills)) {
+                $profileParts[] = "Compétences déclarées: " . implode(', ', $uncertifiedSkills);
             }
         }
 
@@ -323,5 +335,24 @@ class EmbeddingService
             ]);
             return [];
         }
+    }
+
+    /**
+     * Déterminer si une compétence est certifiée (diplôme, certification ou document vérifié)
+     */
+    protected function isCertifiedCompetence(ProfilCompetence $profilComp): bool
+    {
+        $source = strtolower($profilComp->source ?? '');
+        $hasDocument = !empty($profilComp->source_document_id);
+
+        if (in_array($source, ['diplome', 'certification'])) {
+            return true;
+        }
+
+        if ($source === 'document' && $hasDocument) {
+            return true;
+        }
+
+        return $hasDocument && (bool) $profilComp->validee_par_etudiant;
     }
 }
