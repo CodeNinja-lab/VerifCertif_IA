@@ -194,15 +194,13 @@ class DocumentEmissionService
             // Commit de la transaction
             DB::commit();
             
-            // Recharger le document avec ses relations
-            $refreshedDocument = $document->fresh(['etudiant', 'administration']);
+            // Recharger le document depuis la base de données
+            $document->refresh();
             
-            // Vérifier que le document existe toujours (au cas où il aurait été supprimé)
-            if (!$refreshedDocument) {
-                throw new \Exception("Le document a été créé mais n'a pas pu être rechargé depuis la base de données");
-            }
+            // Charger les relations nécessaires
+            $document->load(['etudiant', 'administration']);
             
-            return $refreshedDocument;
+            return $document;
             
         } catch (\Exception $e) {
             DB::rollBack();
