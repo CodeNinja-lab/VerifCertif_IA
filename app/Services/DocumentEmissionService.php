@@ -154,7 +154,9 @@ class DocumentEmissionService
                 Log::warning("Échec de l'ancrage blockchain", [
                     'document_id' => $document->id,
                     'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString(),
                 ]);
+                // Ne pas bloquer l'émission du document
             }
             
             // Log d'audit
@@ -189,9 +191,18 @@ class DocumentEmissionService
                 ]);
             }
             
+            // Commit de la transaction
             DB::commit();
             
-            return $document->fresh(['etudiant', 'administration']);
+            // Recharger le document avec ses relations
+            $refreshedDocument = $document->fresh(['etudiant', 'administration']);
+            
+            // Vérifier que le document existe toujours (au cas où il aurait été supprimé)
+            if (!$refreshedDocument) {
+                throw new \Exception("Le document a été créé mais n'a pas pu être rechargé depuis la base de données");
+            }
+            
+            return $refreshedDocument;
             
         } catch (\Exception $e) {
             DB::rollBack();

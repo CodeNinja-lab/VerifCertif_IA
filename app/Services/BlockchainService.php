@@ -65,8 +65,10 @@ class BlockchainService
             Log::error("Erreur lors de l'ancrage blockchain", [
                 'document_id' => $document->id,
                 'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
             ]);
 
+            // Ne pas bloquer l'émission du document en cas d'erreur blockchain
             return null;
         }
     }
