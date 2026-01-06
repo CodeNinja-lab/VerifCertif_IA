@@ -199,7 +199,7 @@ class AuthController extends Controller
         
         // Charger les relations selon le rôle
         if ($user->role === 'etudiant') {
-            $user->load('profilEtudiant');
+            $user->load(['profilEtudiant.profilCompetences.competence']);
         } elseif ($user->role === 'recruteur') {
             $user->load('offres');
         }

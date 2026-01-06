@@ -398,9 +398,15 @@ class DocumentController extends Controller
             default => 'application/octet-stream',
         };
         
-        return response()->file($filePath, [
+        // Log de téléchargement
+        \Log::info('Téléchargement de document', [
+            'document_id' => $document->id,
+            'user_id' => $user->id,
+            'file_path' => $document->file_url,
+        ]);
+        
+        return response()->download($filePath, $fileName, [
             'Content-Type' => $mimeType,
-            'Content-Disposition' => 'attachment; filename="' . $fileName . '"',
         ]);
     }
 
