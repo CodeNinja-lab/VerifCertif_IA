@@ -21,14 +21,14 @@ class UpdateDiplomeRequest extends FormRequest
      */
     public function rules(): array
     {
-        $diplomeId = $this->route('diplome');
+        $diplomeId = $this->route('id');
         
         return [
             'nom' => 'sometimes|string|max:255',
             'description' => 'nullable|string',
-            'code' => 'sometimes|string|max:100|unique:diplomes,code,' . $diplomeId,
-            'actif' => 'boolean',
-            'ordre' => 'integer|min:0',
+            'code' => 'nullable|string|max:100|unique:diplomes,code,' . $diplomeId,
+            'actif' => 'sometimes|boolean',
+            'ordre' => 'sometimes|integer|min:0',
             'competences' => 'sometimes|array|min:1',
             'competences.*' => 'exists:competences,id',
         ];

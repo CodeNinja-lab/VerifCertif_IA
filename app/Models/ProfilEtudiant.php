@@ -23,6 +23,7 @@ class ProfilEtudiant extends Model
         'salaire_minimum_souhaite',
         'types_contrat_souhaites',
         'profil_public',
+        'date_mise_a_jour',
     ];
 
     protected function casts(): array

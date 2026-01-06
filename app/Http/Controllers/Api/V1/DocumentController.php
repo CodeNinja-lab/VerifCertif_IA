@@ -216,6 +216,13 @@ class DocumentController extends Controller
                         if ($etudiant) {
                             $profilEtudiant = \App\Models\ProfilEtudiant::where('utilisateur_id', $etudiant->id)->first();
                             
+                            // Créer le profil s'il n'existe pas
+                            if (!$profilEtudiant) {
+                                $profilEtudiant = \App\Models\ProfilEtudiant::create([
+                                    'utilisateur_id' => $etudiant->id,
+                                ]);
+                            }
+                            
                             if ($profilEtudiant) {
                                 foreach ($diplome->competences as $competence) {
                                     // Vérifier si la compétence n'est pas déjà liée
@@ -232,6 +239,7 @@ class DocumentController extends Controller
                                             'source_document_id' => $document->id,
                                             'score_confiance' => 1.0,
                                             'validee_par_etudiant' => false,
+                                            'date_extraction' => \Carbon\Carbon::now(),
                                         ]);
                                     }
                                 }

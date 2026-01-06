@@ -18,6 +18,7 @@ class ProfilCompetence extends Model
         'score_confiance',
         'annees_experience',
         'validee_par_etudiant',
+        'date_extraction',
         'date_validation',
     ];
 

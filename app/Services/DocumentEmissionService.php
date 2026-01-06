@@ -146,9 +146,7 @@ class DocumentEmissionService
             // 6. Ancrer sur blockchain (optionnel, peut échouer sans bloquer)
             try {
                 $txHash = $this->blockchainService->anchorDocument($document);
-                if ($txHash) {
-                    $document->refresh(); // Recharger pour avoir le tx_hash
-                }
+                // Note: pas de refresh ici car on est encore dans la transaction
             } catch (\Exception $e) {
                 // Log l'erreur mais ne bloque pas l'émission
                 Log::warning("Échec de l'ancrage blockchain", [
@@ -194,10 +192,7 @@ class DocumentEmissionService
             // Commit de la transaction
             DB::commit();
             
-            // Recharger le document depuis la base de données
-            $document->refresh();
-            
-            // Charger les relations nécessaires
+            // Charger les relations (le document est déjà créé et persisté)
             $document->load(['etudiant', 'administration']);
             
             return $document;

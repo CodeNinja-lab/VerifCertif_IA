@@ -15,6 +15,7 @@ class ProfilCompetenceResource extends JsonResource
             'competence_id' => $this->competence_id,
             'niveau' => $this->niveau,
             'source' => $this->source,
+            'source_document_id' => $this->source_document_id,
             'score_confiance' => $this->score_confiance,
             'annees_experience' => $this->annees_experience,
             'validee_par_etudiant' => $this->validee_par_etudiant,

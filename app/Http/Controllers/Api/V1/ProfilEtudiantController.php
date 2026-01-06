@@ -76,8 +76,10 @@ class ProfilEtudiantController extends Controller
         $profil = ProfilEtudiant::where('utilisateur_id', $request->user()->id)->firstOrFail();
         $validated = $request->validated();
 
+        // Ajouter la date de mise à jour
+        $validated['date_mise_a_jour'] = Carbon::now();
+        
         $profil->update($validated);
-        $profil->touch('date_mise_a_jour');
 
         return response()->json([
             'message' => 'Profil mis à jour avec succès',
