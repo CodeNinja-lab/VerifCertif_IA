@@ -34,4 +34,4 @@ RUN chmod -R 775 storage bootstrap/cache
 EXPOSE 8000
 
 # Démarrer FrankenPHP sur le port dynamique de Railway
-CMD ["sh", "-c", "php artisan config:cache && php artisan migrate --force && frankenphp run --listen :${PORT:-8000}"]
+CMD ["sh", "-c", "php artisan config:cache && php artisan migrate --force && frankenphp run"]
