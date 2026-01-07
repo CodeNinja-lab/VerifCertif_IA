@@ -1,7 +1,16 @@
 FROM dunglas/frankenphp:latest
 
-# Installer les extensions PHP nécessaires
-RUN install-php-extensions gd
+# Paquets système nécessaires à Composer
+RUN apt-get update && apt-get install -y \
+    git \
+    unzip \
+    zip \
+    && rm -rf /var/lib/apt/lists/*
+
+# Extensions PHP nécessaires
+RUN install-php-extensions \
+    gd \
+    zip
 
 # Installer Composer
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
