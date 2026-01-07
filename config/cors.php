@@ -18,7 +18,9 @@ return [
     ],
 
     // Autoriser explicitement votre front Next.js en développement et production
-    'allowed_origins' => ['*'],
+    'allowed_origins' => env('CORS_ALLOWED_ORIGINS') 
+        ? explode(',', env('CORS_ALLOWED_ORIGINS')) 
+        : ['*'],
     
     // Alternative : spécifier uniquement vos domaines
     // 'allowed_origins' => [
