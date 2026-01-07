@@ -17,13 +17,14 @@ return [
         'sanctum/csrf-cookie',
     ],
 
-    // Autoriser explicitement votre front Next.js en développement
-    'allowed_origins' => [
-        'http://localhost:3000',
-    ],
-
-    // Vous pouvez mettre ['*'] si vous voulez tout autoriser en dev
-    // 'allowed_origins' => ['*'],
+    // Autoriser explicitement votre front Next.js en développement et production
+    'allowed_origins' => ['*'],
+    
+    // Alternative : spécifier uniquement vos domaines
+    // 'allowed_origins' => [
+    //     'http://localhost:3000',
+    //     'https://votre-domaine-frontend.vercel.app',
+    // ],
 
     'allowed_origins_patterns' => [],
 
@@ -35,9 +36,8 @@ return [
 
     'max_age' => 0,
 
-    // Si vous envoyez le token dans l'en-tête Authorization, vous pouvez laisser à false.
-    // Mettez à true seulement si vous utilisez des cookies cross-site.
-    'supports_credentials' => false,
+    // Si vous envoyez le token dans l'en-tête Authorization, mettez à true pour Railway
+    'supports_credentials' => true,
 ];
 
 
