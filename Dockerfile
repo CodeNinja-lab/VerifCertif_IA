@@ -6,6 +6,7 @@ RUN apt-get update && apt-get install -y \
 
 RUN install-php-extensions pdo_pgsql pgsql zip gd
 
+# Copier Composer depuis l'image officielle
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 WORKDIR /app
@@ -17,4 +18,5 @@ RUN chmod -R 775 storage bootstrap/cache
 
 EXPOSE 10000
 
-CMD ["sh", "-c", "/usr/bin/frankenphp run --host 0.0.0.0 --port $PORT --root public"]
+# Utiliser la variable d'environnement $PORT et l'exécutable frankenphp du PATH
+CMD ["sh", "-c", "frankenphp run --host 0.0.0.0 --port ${PORT:-10000} --root public"]
