@@ -1,0 +1,62 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Environment
+.env
+.env.example
+.env.backup
+.env.embedding.example
+
+# Dependencies (will be installed during build)
+node_modules
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Documentation
+*.md
+README.md
+README_API.md
+schema_base_donnees*.pdf
+
+# Tests
+tests
+phpunit.xml
+.phpunit.result.cache
+
+# Development
+.editorconfig
+vite.config.js
+package.json
+package-lock.json
+*.code-workspace
+
+# Storage (will be created at runtime)
+storage/logs/*
+storage/framework/cache/*
+storage/framework/sessions/*
+storage/framework/views/*
+!storage/logs/.gitkeep
+!storage/framework/cache/.gitkeep
+!storage/framework/sessions/.gitkeep
+!storage/framework/views/.gitkeep
+
+# Build artifacts
+public/hot
+public/storage
+public/build
+
+# Docker
+.dockerignore
+Dockerfile
+docker-compose.yml

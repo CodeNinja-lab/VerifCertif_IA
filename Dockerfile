@@ -2,8 +2,17 @@ FROM php:8.2-fpm
 
 # Installer les dépendances système
 RUN apt-get update && apt-get install -y \
-    git unzip zip libpng-dev libjpeg-dev libfreetype6-dev \
-    libpq-dev nginx supervisor \
+    git \
+    unzip \
+    zip \
+    curl \
+    libpng-dev \
+    libjpeg-dev \
+    libfreetype6-dev \
+    libpq-dev \
+    libzip-dev \
+    nginx \
+    supervisor \
     && rm -rf /var/lib/apt/lists/*
 
 # Installer les extensions PHP
@@ -16,62 +25,37 @@ COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 # Définir le répertoire de travail
 WORKDIR /app
 
-# Copier les fichiers du projet
-COPY . .
+# Copier les fichiers de dépendances d'abord (cache layer)
+COPY composer.json composer.lock ./
 
 # Installer les dépendances PHP
-RUN composer install --no-dev --optimize-autoloader --no-interaction
+RUN composer install --no-dev --optimize-autoloader --no-interaction --no-scripts
 
-# Définir les permissions
-RUN chmod -R 775 storage bootstrap/cache \
+# Copier le reste des fichiers du projet
+COPY . .
+
+# Finaliser l'installation de Composer
+RUN composer dump-autoload --optimize
+
+# Créer les répertoires nécessaires et définir les permissions
+RUN mkdir -p storage/logs storage/framework/cache storage/framework/sessions storage/framework/views \
+    && chmod -R 775 storage bootstrap/cache \
     && chown -R www-data:www-data /app
 
-# Configuration Nginx
-COPY <<'EOF' /etc/nginx/sites-available/default
-server {
-    listen ${PORT:-10000};
-    server_name _;
-    root /app/public;
-    index index.php;
+# Copier la configuration Nginx
+COPY conf/nginx/nginx-site.conf /etc/nginx/sites-available/default
 
-    location / {
-        try_files $uri $uri/ /index.php?$query_string;
-    }
+# Copier la configuration Supervisor
+COPY conf/supervisor/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
-    location ~ \.php$ {
-        fastcgi_pass 127.0.0.1:9000;
-        fastcgi_index index.php;
-        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
-        include fastcgi_params;
-    }
-}
-EOF
+# Créer un lien symbolique pour Nginx
+RUN ln -sf /etc/nginx/sites-available/default /etc/nginx/sites-enabled/default \
+    && rm -f /etc/nginx/sites-enabled/default.conf
 
-# Configuration Supervisor
-COPY <<'EOF' /etc/supervisor/conf.d/supervisord.conf
-[supervisord]
-nodaemon=true
-user=root
-
-[program:php-fpm]
-command=/usr/local/sbin/php-fpm --nodaemonize
-autostart=true
-autorestart=true
-stdout_logfile=/dev/stdout
-stdout_logfile_maxbytes=0
-stderr_logfile=/dev/stderr
-stderr_logfile_maxbytes=0
-
-[program:nginx]
-command=/bin/sh -c "envsubst '${PORT}' < /etc/nginx/sites-available/default > /etc/nginx/sites-enabled/default && nginx -g 'daemon off;'"
-autostart=true
-autorestart=true
-stdout_logfile=/dev/stdout
-stdout_logfile_maxbytes=0
-stderr_logfile=/dev/stderr
-stderr_logfile_maxbytes=0
-EOF
+# Copier et rendre exécutable le script d'entrée
+COPY docker-entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 EXPOSE 10000
 
-CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+ENTRYPOINT ["docker-entrypoint.sh"]
