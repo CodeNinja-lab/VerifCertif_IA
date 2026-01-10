@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Conversation;
 use App\Models\Message;
 use App\Models\Matching;
+use App\Models\Offre;
 use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -181,7 +182,7 @@ class MessageController extends Controller
     }
 
     /**
-     * Obtenir ou créer une conversation
+     * Obtenir ou créer une conversation (pour recruteur)
      */
     public function getOrCreateConversation(Request $request, $etudiantId, $offreId = null)
     {
@@ -227,6 +228,7 @@ class MessageController extends Controller
         }, 'messages.sender']);
 
         return response()->json([
+            'success' => true,
             'conversation' => [
                 'id' => $conversation->id,
                 'candidate' => $conversation->etudiant->name,
@@ -239,6 +241,70 @@ class MessageController extends Controller
                 return [
                     'id' => $msg->id,
                     'sender' => $msg->sender_id === $user->id ? 'me' : 'candidate',
+                    'content' => $msg->content,
+                    'time' => $msg->created_at->format('H:i'),
+                    'date' => $msg->created_at->format('Y-m-d'),
+                    'is_read' => $msg->is_read,
+                ];
+            }),
+        ]);
+    }
+
+    /**
+     * Obtenir ou créer une conversation (pour étudiant)
+     */
+    public function getOrCreateConversationAsStudent(Request $request, $offreId)
+    {
+        $user = $request->user();
+        
+        if ($user->role !== 'etudiant') {
+            return response()->json(['message' => 'Accès refusé. Seuls les étudiants peuvent utiliser cette fonctionnalité.'], 403);
+        }
+
+        // Récupérer l'offre et son recruteur
+        $offre = Offre::with('recruteur')->findOrFail($offreId);
+        $recruteurId = $offre->recruteur_id;
+
+        // Vérifier si une conversation existe déjà
+        $conversation = Conversation::where('recruteur_id', $recruteurId)
+            ->where('etudiant_id', $user->id)
+            ->where('offre_id', $offreId)
+            ->first();
+
+        // Si pas de conversation, en créer une
+        if (!$conversation) {
+            // Trouver le matching si disponible
+            $matching = Matching::where('offre_id', $offreId)
+                ->where('etudiant_id', $user->id)
+                ->first();
+
+            $conversation = Conversation::create([
+                'recruteur_id' => $recruteurId,
+                'etudiant_id' => $user->id,
+                'offre_id' => $offreId,
+                'matching_id' => $matching?->id,
+            ]);
+        }
+
+        // Charger les relations et messages
+        $conversation->load(['recruteur', 'offre', 'messages' => function($query) {
+            $query->orderBy('created_at', 'asc');
+        }, 'messages.sender']);
+
+        return response()->json([
+            'success' => true,
+            'conversation' => [
+                'id' => $conversation->id,
+                'company' => $offre->entreprise,
+                'recruiter' => $conversation->recruteur->prenom . ' ' . $conversation->recruteur->nom,
+                'recruiter_id' => $conversation->recruteur_id,
+                'offre_id' => $conversation->offre_id,
+                'offre_titre' => $conversation->offre->titre,
+            ],
+            'messages' => $conversation->messages->map(function($msg) use ($user) {
+                return [
+                    'id' => $msg->id,
+                    'sender' => $msg->sender_id === $user->id ? 'me' : 'recruiter',
                     'content' => $msg->content,
                     'time' => $msg->created_at->format('H:i'),
                     'date' => $msg->created_at->format('Y-m-d'),
@@ -281,23 +347,34 @@ class MessageController extends Controller
                 'etudiant_has_unread' => $user->id !== $conversation->etudiant_id,
             ]);
 
-            // Envoyer une notification au destinataire
-            $notificationService = new NotificationService();
-            $destinataireId = $user->id === $conversation->recruteur_id 
-                ? $conversation->etudiant_id 
-                : $conversation->recruteur_id;
-            $expediteurNom = $user->prenom . ' ' . $user->nom;
-            
-            $notificationService->nouveauMessage($destinataireId, $expediteurNom, $conversationId);
-
             DB::commit();
+            
+            // Envoyer une notification au destinataire (en arrière-plan, ne bloque pas)
+            try {
+                $notificationService = new NotificationService();
+                $destinataireId = $user->id === $conversation->recruteur_id 
+                    ? $conversation->etudiant_id 
+                    : $conversation->recruteur_id;
+                $expediteurNom = $user->prenom . ' ' . $user->nom;
+                
+                $notificationService->nouveauMessage($destinataireId, $expediteurNom, $conversationId);
+            } catch (\Exception $e) {
+                // Les notifications ne doivent pas bloquer l'envoi de message
+                \Log::warning('Erreur notification message', ['error' => $e->getMessage()]);
+            }
 
             $message->load('sender');
 
+            // Déterminer le sender basé sur le rôle de l'utilisateur qui envoie
+            // Pour l'étudiant : 'me' si c'est lui, 'recruiter' si c'est le recruteur
+            // Pour le recruteur : 'me' si c'est lui, 'candidate' si c'est l'étudiant
+            $sender = 'me'; // Par défaut, c'est toujours 'me' pour celui qui envoie
+
             return response()->json([
+                'success' => true,
                 'message' => [
                     'id' => $message->id,
-                    'sender' => $message->sender_id === $conversation->recruteur_id ? 'me' : 'candidate',
+                    'sender' => $sender,
                     'content' => $message->content,
                     'time' => $message->created_at->format('H:i'),
                     'date' => $message->created_at->format('Y-m-d'),

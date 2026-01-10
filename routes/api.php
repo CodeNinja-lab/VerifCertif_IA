@@ -232,6 +232,7 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
         // Routes pour étudiants
         Route::get('/my-conversations', [App\Http\Controllers\Api\V1\MessageController::class, 'studentConversations']);
         Route::get('/my-conversation/{id}', [App\Http\Controllers\Api\V1\MessageController::class, 'getStudentConversation']);
+        Route::get('/student/conversation/{offreId}/create', [App\Http\Controllers\Api\V1\MessageController::class, 'getOrCreateConversationAsStudent'])->middleware('role:etudiant');
         
         // Routes communes
         Route::get('/conversation/{id}', [App\Http\Controllers\Api\V1\MessageController::class, 'getConversation']);

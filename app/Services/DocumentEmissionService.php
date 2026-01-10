@@ -102,26 +102,35 @@ class DocumentEmissionService
             }
             
             // Récupérer l'ID étudiant depuis les métadonnées ou l'ID fourni
-            $etudiantId = $data['etudiant_id'] ?? null;
+            $etudiantId = null;
             
-            // Si pas d'etudiant_id mais student_id dans metadata, chercher l'étudiant par numero_etudiant
-            if (!$etudiantId && isset($metadata['student_id'])) {
+            // PRIORITÉ 1: student_id dans metadata (le plus fiable)
+            if (isset($metadata['student_id'])) {
                 $etudiant = \App\Models\User::where('numero_etudiant', $metadata['student_id'])
                     ->where('role', 'etudiant')
                     ->first();
                 if ($etudiant) {
                     $etudiantId = $etudiant->id;
+                    Log::info('Étudiant trouvé par numero_etudiant', [
+                        'numero_etudiant' => $metadata['student_id'],
+                        'etudiant_id' => $etudiantId,
+                    ]);
+                } else {
+                    Log::warning('Aucun étudiant trouvé avec ce numéro', [
+                        'numero_etudiant' => $metadata['student_id'],
+                    ]);
                 }
             }
             
-            // Pour l'instant, si pas d'étudiant, on utilise l'admin
-            // Solution temporaire : utiliser l'ID de l'opérateur comme étudiant si pas d'étudiant spécifié
-            if (!$etudiantId) {
-                $etudiantId = $data['operateur_id'] ?? null;
+            // PRIORITÉ 2: etudiant_id fourni directement (si pas trouvé par numero)
+            if (!$etudiantId && isset($data['etudiant_id'])) {
+                $etudiantId = $data['etudiant_id'];
+                Log::info('Utilisation de etudiant_id fourni', ['etudiant_id' => $etudiantId]);
             }
             
+            // Si toujours pas d'étudiant, erreur (ne JAMAIS utiliser l'admin)
             if (!$etudiantId) {
-                throw new \Exception('Un ID étudiant est requis pour créer le document');
+                throw new \Exception('Impossible de trouver l\'étudiant. Vérifiez le numéro étudiant (student_id) ou l\'ID étudiant.');
             }
             
             $document = Document::create([
@@ -140,13 +149,27 @@ class DocumentEmissionService
                 'metadata' => $metadata,
             ]);
             
+            Log::info('Document créé avec succès AVANT QR et blockchain', [
+                'document_id' => $document->id,
+                'uuid' => $document->uuid_document,
+                'etudiant_id' => $etudiantId,
+            ]);
+            
             // 5. Générer le QR code
             $qrCodeUrl = $this->qrCodeService->generateQrCode($document);
             
-            // 6. Ancrer sur blockchain (optionnel, peut échouer sans bloquer)
+            // Commit de la transaction MAINTENANT avant blockchain et notifications
+            DB::commit();
+            
+            Log::info('Transaction committée avec succès', [
+                'document_id' => $document->id,
+                'exists_in_db' => Document::where('id', $document->id)->exists(),
+            ]);
+            
+            // 6. Ancrer sur blockchain (APRÈS le commit, en dehors de la transaction)
             try {
                 $txHash = $this->blockchainService->anchorDocument($document);
-                // Note: pas de refresh ici car on est encore dans la transaction
+                $document->refresh(); // Recharger après modification
             } catch (\Exception $e) {
                 // Log l'erreur mais ne bloque pas l'émission
                 Log::warning("Échec de l'ancrage blockchain", [
@@ -173,7 +196,7 @@ class DocumentEmissionService
                 'user_agent' => request()->userAgent(),
             ]);
             
-            // Envoyer une notification à l'étudiant
+            // Envoyer une notification à l'étudiant (APRÈS le commit, en dehors de la transaction)
             try {
                 $notificationService = new NotificationService();
                 $notificationService->certificatDisponible(
@@ -188,9 +211,6 @@ class DocumentEmissionService
                     'error' => $e->getMessage(),
                 ]);
             }
-            
-            // Commit de la transaction
-            DB::commit();
             
             // Charger les relations (le document est déjà créé et persisté)
             $document->load(['etudiant', 'administration']);
