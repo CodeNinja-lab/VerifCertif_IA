@@ -14,7 +14,6 @@ RUN install-php-extensions \
     pdo_pgsql \
     pgsql
 
-
 # Installer Composer
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
@@ -27,11 +26,11 @@ RUN composer install \
     --optimize-autoloader \
     --no-interaction
 
-# Permissions pour le storage
+# Permissions Laravel
 RUN chmod -R 775 storage bootstrap/cache
 
-# Railway fournit la variable PORT
-EXPOSE 8000
+# Render fournit aussi $PORT
+EXPOSE 10000
 
-# Démarrer FrankenPHP sur le port dynamique de Railway
-CMD ["sh", "-c", "php artisan config:cache && php artisan migrate --force && frankenphp run"]
+# Lancer Laravel avec FrankenPHP sur Render
+CMD ["sh", "-c", "php artisan config:clear && php artisan config:cache && php artisan migrate --force || true && frankenphp run --host 0.0.0.0 --port $PORT --root public"]
