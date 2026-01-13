@@ -41,6 +41,44 @@ class CVController extends Controller
         ]);
     }
 
+    /**
+     * Obtenir le CV d'un étudiant par son ID (pour recruteurs)
+     */
+    public function showByUserId(Request $request, $userId)
+    {
+        // Vérifier que l'utilisateur est recruteur ou admin
+        $currentUser = $request->user();
+        if (!in_array($currentUser->role, ['recruteur', 'admin'])) {
+            return response()->json(['message' => 'Accès refusé'], 403);
+        }
+
+        // Vérifier que l'utilisateur cible existe et est un étudiant
+        $targetUser = \App\Models\User::find($userId);
+        if (!$targetUser || $targetUser->role !== 'etudiant') {
+            return response()->json(['message' => 'Étudiant non trouvé'], 404);
+        }
+
+        $experiences = Experience::where('utilisateur_id', $userId)
+            ->orderBy('poste_actuel', 'desc')
+            ->orderBy('date_debut', 'desc')
+            ->get();
+
+        $formations = Formation::where('utilisateur_id', $userId)
+            ->orderBy('en_cours', 'desc')
+            ->orderBy('date_debut', 'desc')
+            ->get();
+
+        $certifications = Certification::where('utilisateur_id', $userId)
+            ->orderBy('date_obtention', 'desc')
+            ->get();
+
+        return response()->json([
+            'experiences' => ExperienceResource::collection($experiences),
+            'formations' => FormationResource::collection($formations),
+            'certifications' => CertificationResource::collection($certifications),
+        ]);
+    }
+
     // ===================== EXPERIENCES =====================
 
     /**

@@ -125,6 +125,11 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
         Route::delete('/competences/{competenceId}', [App\Http\Controllers\Api\V1\ProfilEtudiantController::class, 'removeCompetence']);
     });
     
+    // Profil étudiant par ID (pour recruteurs/admin)
+    Route::get('/etudiant/{userId}/profil', [App\Http\Controllers\Api\V1\ProfilEtudiantController::class, 'showByUserId'])
+        ->middleware('role:recruteur,admin')
+        ->where('userId', '[0-9]+');
+    
     // CV - Expériences, Formations, Certifications
     Route::prefix('cv')->group(function () {
         // Toutes les données du CV
@@ -151,6 +156,11 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
         Route::put('/certifications/{id}', [App\Http\Controllers\Api\V1\CVController::class, 'certificationUpdate']);
         Route::delete('/certifications/{id}', [App\Http\Controllers\Api\V1\CVController::class, 'certificationDestroy']);
     });
+    
+    // CV d'un étudiant par ID (pour recruteurs/admin)
+    Route::get('/etudiant/{userId}/cv', [App\Http\Controllers\Api\V1\CVController::class, 'showByUserId'])
+        ->middleware('role:recruteur,admin')
+        ->where('userId', '[0-9]+');
     
     // Offres d'emploi
     Route::prefix('offres')->group(function () {

@@ -34,6 +34,33 @@ class ProfilEtudiantController extends Controller
     }
 
     /**
+     * Afficher le profil public d'un étudiant (pour recruteurs)
+     */
+    public function showByUserId(Request $request, $userId)
+    {
+        // Vérifier que l'utilisateur est recruteur ou admin
+        $currentUser = $request->user();
+        if (!in_array($currentUser->role, ['recruteur', 'admin'])) {
+            return response()->json(['message' => 'Accès refusé'], 403);
+        }
+
+        $profil = ProfilEtudiant::with(['utilisateur', 'profilCompetences.competence'])
+                               ->where('utilisateur_id', $userId)
+                               ->first();
+
+        if (!$profil) {
+            return response()->json(['message' => 'Profil non trouvé'], 404);
+        }
+
+        // Vérifier que le profil est public OU que c'est un admin
+        if (!$profil->profil_public && $currentUser->role !== 'admin') {
+            return response()->json(['message' => 'Ce profil est privé'], 403);
+        }
+
+        return new ProfilEtudiantResource($profil);
+    }
+
+    /**
      * Créer un profil étudiant
      */
     public function store(StoreProfilEtudiantRequest $request)

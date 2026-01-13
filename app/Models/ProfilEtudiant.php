@@ -48,4 +48,9 @@ class ProfilEtudiant extends Model
     {
         return $this->hasMany(ProfilCompetence::class, 'profil_etudiant_id');
     }
+
+    public function candidateEmbedding()
+    {
+        return $this->hasOne(CandidateEmbedding::class, 'id', 'utilisateur_id');
+    }
 }

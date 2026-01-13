@@ -11,6 +11,7 @@ use App\Http\Resources\Api\V1\OffreCompetenceResource;
 use App\Http\Resources\Api\V1\MatchingResource;
 use App\Models\Offre;
 use App\Models\OffreCompetence;
+use App\Models\OffreView;
 use App\Models\Competence;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
@@ -133,12 +134,31 @@ class OffreController extends Controller
     /**
      * Afficher une offre
      */
-    public function show($id)
+    public function show(Request $request, $id)
     {
         $offre = Offre::with(['recruteur', 'offreCompetences.competence'])->findOrFail($id);
         
-        // Incrémenter le nombre de vues
-        $offre->increment('nombre_vues');
+        // Incrémenter le nombre de vues uniquement si c'est un étudiant authentifié
+        // et qu'il n'a pas déjà vu cette offre
+        $user = $request->user();
+        
+        if ($user && $user->role === 'etudiant') {
+            // Vérifier si l'étudiant a déjà vu cette offre
+            $existingView = OffreView::where('offre_id', $offre->id)
+                ->where('user_id', $user->id)
+                ->first();
+            
+            // Si pas de vue existante, créer une nouvelle vue et incrémenter le compteur
+            if (!$existingView) {
+                OffreView::create([
+                    'offre_id' => $offre->id,
+                    'user_id' => $user->id,
+                    'viewed_at' => now(),
+                ]);
+                
+                $offre->increment('nombre_vues');
+            }
+        }
 
         return new OffreResource($offre);
     }

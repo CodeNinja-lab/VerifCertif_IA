@@ -19,27 +19,20 @@ return [
 
     // Autoriser explicitement votre front Next.js en développement et production
     'allowed_origins' => env('CORS_ALLOWED_ORIGINS') 
-        ? explode(',', env('CORS_ALLOWED_ORIGINS')) 
+        ? array_map('trim', explode(',', env('CORS_ALLOWED_ORIGINS')))
         : ['*'],
     
-    // Alternative : spécifier uniquement vos domaines
-    // 'allowed_origins' => [
-    //     'http://localhost:3000',
-    //     'https://votre-domaine-frontend.vercel.app',
-    // ],
+    'allowed_origins_patterns' => [
+        env('APP_ENV') === 'local' ? '*' : null,
+    ],
 
-    'allowed_origins_patterns' => [],
+    'allowed_methods' => ['*'],
 
-    'allowed_methods' => ['*'], // GET, POST, PUT, DELETE, OPTIONS, ...
+    'allowed_headers' => ['*'],
 
-    'allowed_headers' => ['*'], // Authorization, Content-Type, X-Requested-With, etc.
+    'exposed_headers' => ['*'],
 
-    'exposed_headers' => [],
+    'max_age' => 86400,
 
-    'max_age' => 0,
-
-    // Si vous envoyez le token dans l'en-tête Authorization, mettez à true pour Railway
     'supports_credentials' => true,
 ];
-
-

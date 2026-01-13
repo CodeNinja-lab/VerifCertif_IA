@@ -58,8 +58,11 @@ class AIService
     public function healthCheck(): bool
     {
         try {
-            $response = Http::timeout(5)->get("{$this->baseUrl}/");
-            return $response->successful();
+            // Tester avec un petit embedding au lieu de GET /
+            $response = Http::timeout(5)->post("{$this->baseUrl}/embed", [
+                'text' => 'health check test',
+            ]);
+            return $response->successful() && isset($response->json()['embedding']);
         } catch (\Exception $e) {
             return false;
         }

@@ -60,4 +60,19 @@ class Offre extends Model
     {
         return $this->hasMany(Matching::class, 'offre_id');
     }
+
+    public function jobEmbedding()
+    {
+        return $this->hasOne(JobOfferEmbedding::class, 'id', 'id');
+    }
+
+    public function candidatures()
+    {
+        return $this->hasMany(Candidature::class, 'offre_id');
+    }
+
+    public function views()
+    {
+        return $this->hasMany(OffreView::class, 'offre_id');
+    }
 }
