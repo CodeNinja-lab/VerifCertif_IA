@@ -102,8 +102,6 @@ class GenerateEmbeddings extends Command
                     $success++;
                     $this->newLine();
                     $this->info("✓ Candidate {$profil->utilisateur->fullname} (ID: {$profil->utilisateur_id})");
-                    $this->line("  Profile text length: " . strlen($result['profile_text']) . " chars");
-                    $this->line("  Embedding dimension: " . count($result['embedding']) . " vectors");
                 } else {
                     $errors++;
                     $this->newLine();
@@ -156,8 +154,6 @@ class GenerateEmbeddings extends Command
                     $success++;
                     $this->newLine();
                     $this->info("✓ Job offer: {$offre->titre} (ID: {$offre->id})");
-                    $this->line("  Job text length: " . strlen($result['job_text']) . " chars");
-                    $this->line("  Embedding dimension: " . count($result['embedding']) . " vectors");
                 } else {
                     $errors++;
                     $this->newLine();

@@ -31,6 +31,12 @@ class Offre extends Model
         'annees_experience_min',
         'date_expiration',
         'statut',
+        'source_name',
+        'source_account',
+        'source_external_id',
+        'source_url',
+        'source_imported_at',
+        'source_last_seen_at',
     ];
 
     protected function casts(): array
@@ -38,6 +44,8 @@ class Offre extends Model
         return [
             'date_publication' => 'datetime',
             'date_expiration' => 'date',
+            'source_imported_at' => 'datetime',
+            'source_last_seen_at' => 'datetime',
             'avantages' => 'array',
             'processus_recrutement' => 'array',
         ];

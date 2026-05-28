@@ -166,6 +166,7 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     Route::prefix('offres')->group(function () {
         // Route pour les offres du recruteur (authentifiée) - DOIT être AVANT les routes avec {id}
         Route::get('/my-offres', [App\Http\Controllers\Api\V1\OffreController::class, 'myOffres'])->middleware('role:recruteur,admin');
+        Route::post('/sync', [App\Http\Controllers\Api\V1\OffreController::class, 'syncExternalOffers'])->middleware('role:recruteur,admin');
         
         Route::post('/', [App\Http\Controllers\Api\V1\OffreController::class, 'store'])->middleware('role:recruteur,admin');
         

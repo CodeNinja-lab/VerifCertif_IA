@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\StoreOffreRequest;
 use App\Http\Requests\Api\V1\UpdateOffreRequest;
+use App\Http\Requests\Api\V1\SyncExternalOffersRequest;
 use App\Http\Requests\Api\V1\AddCompetenceToOffreRequest;
 use App\Http\Resources\Api\V1\OffreResource;
 use App\Http\Resources\Api\V1\OffreCompetenceResource;
@@ -13,7 +14,9 @@ use App\Models\Offre;
 use App\Models\OffreCompetence;
 use App\Models\OffreView;
 use App\Models\Competence;
+use Illuminate\Support\Arr;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
 class OffreController extends Controller
@@ -30,7 +33,13 @@ class OffreController extends Controller
         }
         
         $query = Offre::with(['recruteur', 'offreCompetences.competence'])
-                     ->where('recruteur_id', $user->id);
+                     ->withCount('candidatures');
+        
+        // Pour les recruteurs, filtrer uniquement leurs offres
+        // Pour les admins, montrer toutes les offres
+        if ($user->role === 'recruteur') {
+            $query->where('recruteur_id', $user->id);
+        }
         
         // Filtrer par statut si demandé
         if ($request->has('statut') && $request->statut !== 'all') {
@@ -62,7 +71,8 @@ class OffreController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Offre::with(['recruteur', 'offreCompetences.competence']);
+        $query = Offre::with(['recruteur', 'offreCompetences.competence'])
+                     ->withCount('candidatures');
 
         // Vérifier si c'est pour voir ses propres offres
         // Si my_offres est demandé, on DOIT être authentifié
@@ -218,6 +228,128 @@ class OffreController extends Controller
         return response()->json([
             'message' => 'Offre mise à jour avec succès',
             'offre' => new OffreResource($offre->fresh()->load('recruteur', 'offreCompetences.competence')),
+        ]);
+    }
+
+    /**
+     * Synchroniser les offres externes d'une source dédiée.
+     */
+    public function syncExternalOffers(SyncExternalOffersRequest $request)
+    {
+        $validated = $request->validated();
+        $user = $request->user();
+        $sourceName = $validated['source_name'];
+        $sourceAccount = $validated['source_account'];
+        $now = Carbon::now();
+        $incomingIds = collect($validated['offers'])->pluck('external_id')->all();
+
+        $result = DB::transaction(function () use ($validated, $user, $sourceName, $sourceAccount, $now, $incomingIds) {
+            $created = 0;
+            $updated = 0;
+            $skipped = 0;
+
+            foreach ($validated['offers'] as $payload) {
+                $criteria = [
+                    'recruteur_id' => $user->id,
+                    'source_name' => $sourceName,
+                    'source_account' => $sourceAccount,
+                    'source_external_id' => $payload['external_id'],
+                ];
+
+                $offre = Offre::firstOrNew($criteria);
+                $wasNew = !$offre->exists;
+                $before = $wasNew ? null : Arr::only($offre->getRawOriginal(), [
+                    'titre',
+                    'description',
+                    'entreprise',
+                    'lieu',
+                    'type_contrat',
+                    'teletravail',
+                    'salaire_min',
+                    'salaire_max',
+                    'devise',
+                    'date_expiration',
+                    'statut',
+                    'source_url',
+                ]);
+
+                $attributes = [
+                    'titre' => $payload['title'],
+                    'description' => $payload['description'],
+                    'entreprise' => $payload['company'],
+                    'lieu' => $payload['location'] ?: 'Dakar, Sénégal',
+                    'type_contrat' => $payload['contract_type'] ?: 'CDI',
+                    'teletravail' => $payload['remote_type'] ?? null,
+                    'salaire_min' => $payload['salary_min'] ?? null,
+                    'salaire_max' => $payload['salary_max'] ?? null,
+                    'devise' => $payload['currency'] ?? 'XOF',
+                    'date_expiration' => $payload['expires_at'] ?? null,
+                    'statut' => 'PUBLIEE',
+                    'source_url' => $payload['source_url'] ?? ($payload['metadata']['source_url'] ?? null),
+                    'source_imported_at' => $offre->source_imported_at ?? $now,
+                    'source_last_seen_at' => $now,
+                ];
+
+                $offre->fill($attributes);
+                $desiredComparable = Arr::only($attributes, [
+                    'titre',
+                    'description',
+                    'entreprise',
+                    'lieu',
+                    'type_contrat',
+                    'teletravail',
+                    'salaire_min',
+                    'salaire_max',
+                    'devise',
+                    'date_expiration',
+                    'statut',
+                    'source_url',
+                ]);
+
+                $offre->save();
+
+                if ($wasNew) {
+                    $created++;
+                    continue;
+                }
+
+                if ($before === $desiredComparable) {
+                    $skipped++;
+                } else {
+                    $updated++;
+                }
+            }
+
+            $expired = 0;
+            if (($validated['mark_missing_as_expired'] ?? true) === true) {
+                $expired = Offre::where('recruteur_id', $user->id)
+                    ->where('source_name', $sourceName)
+                    ->where('source_account', $sourceAccount)
+                    ->whereNotIn('source_external_id', $incomingIds)
+                    ->update([
+                        'statut' => 'EXPIREE',
+                        'source_last_seen_at' => $now,
+                    ]);
+            }
+
+            return [
+                'created' => $created,
+                'updated' => $updated,
+                'skipped' => $skipped,
+                'expired' => $expired,
+            ];
+        });
+
+        return response()->json([
+            'message' => 'Synchronisation externe terminée',
+            'source_name' => $sourceName,
+            'source_account' => $sourceAccount,
+            'recruteur_id' => $user->id,
+            'received' => count($validated['offers']),
+            'created' => $result['created'],
+            'updated' => $result['updated'],
+            'skipped' => $result['skipped'],
+            'expired' => $result['expired'],
         ]);
     }
 

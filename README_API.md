@@ -113,6 +113,7 @@ php artisan vendor:publish --provider="Laravel\Sanctum\SanctumServiceProvider"
 - `GET /` - Liste des offres (public pour PUBLIEE)
 - `GET /{id}` - Afficher une offre (public)
 - `POST /` - Créer une offre (recruteur/admin)
+- `POST /sync` - Synchroniser un lot externe et marquer les absentes comme expirées (recruteur/admin)
 - `PUT /{id}` - Mettre à jour (recruteur/admin)
 - `DELETE /{id}` - Supprimer (recruteur/admin)
 - `POST /{id}/publish` - Publier une offre (recruteur/admin)
@@ -122,6 +123,8 @@ php artisan vendor:publish --provider="Laravel\Sanctum\SanctumServiceProvider"
 - `PUT /{id}/competences/{competenceId}` - Mettre à jour (recruteur/admin)
 - `DELETE /{id}/competences/{competenceId}` - Supprimer (recruteur/admin)
 - `GET /{id}/matchings` - Matchings de l'offre (recruteur/admin)
+
+Le lot externe utilise les champs de provenance `source_name`, `source_account`, `source_external_id`, `source_url`, `source_imported_at` et `source_last_seen_at` sur le modèle `Offre`.
 
 #### Matchings (`/api/v1/matchings`)
 - `GET /` - Liste des matchings de l'étudiant (authentifié)

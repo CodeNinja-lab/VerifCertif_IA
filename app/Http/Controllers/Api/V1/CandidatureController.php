@@ -242,15 +242,15 @@ class CandidatureController extends Controller
             ], 404);
         }
         
-        // Vérifier que l'utilisateur est le recruteur de l'offre
-        if ($offre->recruteur_id !== $user->id) {
+        // Vérifier que l'utilisateur est le recruteur de l'offre ou un admin
+        if ($offre->recruteur_id !== $user->id && $user->role !== 'admin') {
             return response()->json([
                 'success' => false,
                 'message' => 'Vous n\'êtes pas autorisé à voir ces candidatures.',
             ], 403);
         }
         
-        $candidatures = Candidature::with('etudiant', 'etudiant.profilEtudiant')
+        $candidatures = Candidature::with(['etudiant', 'etudiant.profilEtudiant', 'offre'])
             ->forOffre($offreId)
             ->orderBy('created_at', 'desc')
             ->get();

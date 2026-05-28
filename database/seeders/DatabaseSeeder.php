@@ -51,6 +51,7 @@ class DatabaseSeeder extends Seeder
 
         $this->call([
             TestAdministrationSeeder::class,
+            ExpatDakarImportSeeder::class,
         ]);
     }
 }

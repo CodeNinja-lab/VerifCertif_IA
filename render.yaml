@@ -54,6 +54,12 @@ services:
         value: stack
       - key: LOG_LEVEL
         value: info
+      - key: AI_API_URL
+        value: https://verifcertif-ia-1.onrender.com
+      - key: AI_API_TIMEOUT
+        value: 60
+      - key: GEMINI_API_KEY
+        sync: false
 
 databases:
   - name: veriCertis-db
