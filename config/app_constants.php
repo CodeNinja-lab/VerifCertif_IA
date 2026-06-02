@@ -41,4 +41,10 @@ return [
         'auth' => 5, // 5 tentatives
         'password_reset' => 3, // 3 tentatives
     ],
+
+    'expat_dakar_import' => [
+        'email' => env('EXPAT_DAKAR_IMPORT_EMAIL', 'expat-dakar-import@vericertis.sn'),
+        'name' => env('EXPAT_DAKAR_IMPORT_NAME', 'Expat Dakar Import'),
+        'phone' => env('EXPAT_DAKAR_IMPORT_PHONE', '+221000000001'),
+    ],
 ];

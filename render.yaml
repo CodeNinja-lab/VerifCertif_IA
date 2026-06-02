@@ -60,6 +60,12 @@ services:
         value: 60
       - key: GEMINI_API_KEY
         sync: false
+      - key: OFFERS_SYNC_SERVICE_URL
+        sync: false
+      - key: OFFERS_SYNC_SERVICE_TOKEN
+        sync: false
+      - key: OFFERS_SYNC_TIMEOUT
+        value: 120
 
 databases:
   - name: veriCertis-db

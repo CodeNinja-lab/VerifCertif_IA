@@ -14,6 +14,7 @@ use App\Models\Offre;
 use App\Models\OffreCompetence;
 use App\Models\OffreView;
 use App\Models\Competence;
+use App\Models\User;
 use Illuminate\Support\Arr;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -237,20 +238,36 @@ class OffreController extends Controller
     public function syncExternalOffers(SyncExternalOffersRequest $request)
     {
         $validated = $request->validated();
-        $user = $request->user();
+        $importerEmail = config('app_constants.expat_dakar_import.email', env('EXPAT_DAKAR_IMPORT_EMAIL', 'expat-dakar-import@vericertis.sn'));
+        $importerUser = User::where('email', $importerEmail)->first();
+
+        if (!$importerUser) {
+            return response()->json([
+                'message' => 'Le compte technique Expat Dakar Import est introuvable.',
+            ], 500);
+        }
+
+        $authenticatedUser = $request->user();
+
+        if (!$authenticatedUser || $authenticatedUser->id !== $importerUser->id) {
+            return response()->json([
+                'message' => 'Accès refusé: la synchronisation Expat Dakar utilise un seul compte technique dédié.',
+            ], 403);
+        }
+
         $sourceName = $validated['source_name'];
         $sourceAccount = $validated['source_account'];
         $now = Carbon::now();
         $incomingIds = collect($validated['offers'])->pluck('external_id')->all();
 
-        $result = DB::transaction(function () use ($validated, $user, $sourceName, $sourceAccount, $now, $incomingIds) {
+        $result = DB::transaction(function () use ($validated, $importerUser, $sourceName, $sourceAccount, $now, $incomingIds) {
             $created = 0;
             $updated = 0;
             $skipped = 0;
 
             foreach ($validated['offers'] as $payload) {
                 $criteria = [
-                    'recruteur_id' => $user->id,
+                    'recruteur_id' => $importerUser->id,
                     'source_name' => $sourceName,
                     'source_account' => $sourceAccount,
                     'source_external_id' => $payload['external_id'],
@@ -322,7 +339,7 @@ class OffreController extends Controller
 
             $expired = 0;
             if (($validated['mark_missing_as_expired'] ?? true) === true) {
-                $expired = Offre::where('recruteur_id', $user->id)
+                $expired = Offre::where('recruteur_id', $importerUser->id)
                     ->where('source_name', $sourceName)
                     ->where('source_account', $sourceAccount)
                     ->whereNotIn('source_external_id', $incomingIds)
@@ -344,7 +361,7 @@ class OffreController extends Controller
             'message' => 'Synchronisation externe terminée',
             'source_name' => $sourceName,
             'source_account' => $sourceAccount,
-            'recruteur_id' => $user->id,
+            'recruteur_id' => $importerUser->id,
             'received' => count($validated['offers']),
             'created' => $result['created'],
             'updated' => $result['updated'],
